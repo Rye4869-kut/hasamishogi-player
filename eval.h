@@ -1,5 +1,5 @@
 #pragma once
-#include "Board.h"
+#include "board.h"
 
 static const int INF = 1'000'000;
 
