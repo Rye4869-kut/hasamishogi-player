@@ -1,6 +1,7 @@
 #include "search.h"
 #include <algorithm>
 #include <vector>
+#include <iostream>
 
 static const int REPETITION_PENALTY = INF;
 
@@ -141,6 +142,7 @@ Move choose_best_move(const Board& board, char me, double time_limit_sec,
         // completed が false = 時間切れで途中打ち切り → 全手を比較していないので信頼できない
         // 完走した深さの結果だけを採用する
         if (completed) best_move = best_at_depth;
+        std::cerr << "depth: " << depth << "\n" << std::flush;  // 深さ確認
     }
 
     return best_move;
