@@ -26,6 +26,8 @@ static bool parse_move(const std::string& s, Move& mv) {
 }
 
 int main() {
+    // C の printf/scanf との同期を切って入出力を高速化
+    // cin.tie(nullptr): cout が cin の前に自動でフラッシュする動作を無効化
     std::ios::sync_with_stdio(false);
     std::cin.tie(nullptr);
 
@@ -44,6 +46,8 @@ int main() {
     Board board;
     StateTable state_table;  // 局面の出現回数テーブル
     // 黒は先攻なので相手手の入力を最初だけスキップ
+    // 黒番は先攻なので最初の手を指す前に相手の手を受け取る必要がない
+    // 2手目以降は通常通り相手の手を受け取ってから指す
     bool skip_input = (my_color == BLACK);
 
     // ── メインループ ──────────────────────────────────
@@ -51,6 +55,7 @@ int main() {
         if (!skip_input) {
             if (!std::getline(std::cin, line)) break;
             line = trim(line);
+            // rfind("GAME_OVER", 0) == 0: 文字列が "GAME_OVER" で始まるかの判定
             if (line.rfind("GAME_OVER", 0) == 0) break;
 
             Move opp_mv;
@@ -65,6 +70,8 @@ int main() {
         board.apply_move(mv.r1, mv.c1, mv.r2, mv.c2, my_color);
         // 自分が指した後の局面を記録
         state_table[board.hash()]++;
+        // "\n" だけではバッファに溜まって arena に届かない場合がある
+        // flush で強制送信することで arena がすぐ手を受け取れる
         std::cout << mv.r1 << mv.c1 << mv.r2 << mv.c2 << "\n" << std::flush;
 
         skip_input = false;

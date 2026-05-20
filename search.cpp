@@ -3,6 +3,8 @@
 #include <vector>
 
 // ── タイマー ──────────────────────────────────────────
+// g_start, g_time_limit をグローバル変数にしている理由:
+// negamax の再帰呼び出しに毎回引数として渡すとシグネチャが複雑になるため
 static TimePoint g_start;
 static double    g_time_limit;
 
@@ -11,13 +13,13 @@ static double elapsed() {
 }
 
 // ── 手のオーダリング ──────────────────────────────────
-// 取り駒が期待できる手を先頭に、次に中央近くへの手を優先する
+// 取り駒が期待できる手を先頭に，次に中央近くへの手を優先する
 // 軽量なヒューリスティック (apply_move は呼ばない)
 static int move_score(const Board& b, const Move& mv, char me) {
     char opp = opp_color(me);
     int score = 0;
 
-    // 各方向: 直後に相手駒があり、逆側に自駒があれば捕獲の見込みあり
+    // 各方向: 直後に相手駒があり，逆側に自駒があれば捕獲の見込みあり
     for (int d = 0; d < 4; d++) {
         int r = mv.r2 + DR[d], c = mv.c2 + DC[d];
         int cnt = 0;
@@ -49,6 +51,7 @@ static std::vector<Move> order_moves(const Board& b,
 // 9×9 の char 配列なのでコピーコストは低い
 static int negamax(Board board, int depth, int alpha, int beta, char me,
                    const StateTable& state_table) {
+    // 0.95: 再帰の中での打ち切り．本当に時間切れ直前でそれ以上再帰しても意味がない
     if (elapsed() > g_time_limit * 0.95)
         return evaluate(board, me, state_table);
 
@@ -69,9 +72,13 @@ static int negamax(Board board, int depth, int alpha, int beta, char me,
     for (const Move& mv : moves) {
         Board next = board;
         next.apply_move(mv.r1, mv.c1, mv.r2, mv.c2, me);
+        // Negamax の核心: 相手から見たスコアは自分から見たスコアの符号を反転したもの
+        // → どちらのターンでも「自分視点の最大化」だけ書けばよい
         int val = -negamax(next, depth - 1, -beta, -alpha, opp, state_table);
         if (val > best) best = val;
         if (val > alpha) alpha = val;
+        // alpha >= beta: 自分がすでに beta 以上を保証できる
+        // → 相手はこの枝を選ばないので残りの手を読む必要がない（ベータカット）
         if (alpha >= beta) break;
     }
     return best;
@@ -89,6 +96,7 @@ Move choose_best_move(const Board& board, char me, double time_limit_sec,
     Move best_move = moves[0];
 
     for (int depth = 1; ; depth++) {
+        // 0.8: 次の深さを始めるか判断．余裕を持って打ち切り，中途半端に終わるのを防ぐ
         if (elapsed() > g_time_limit * 0.8) break;
 
         int  best_val = -INF - 1;
@@ -97,6 +105,7 @@ Move choose_best_move(const Board& board, char me, double time_limit_sec,
 
         auto ordered = order_moves(board, moves, me);
         for (const Move& mv : ordered) {
+            // 0.9: 各手の探索開始判断．残り時間が少ないなら新しい手の探索を始めない
             if (elapsed() > g_time_limit * 0.9) { completed = false; break; }
 
             Board next = board;
@@ -109,6 +118,8 @@ Move choose_best_move(const Board& board, char me, double time_limit_sec,
             }
         }
 
+        // completed が false = 時間切れで途中打ち切り → 全手を比較していないので信頼できない
+        // 完走した深さの結果だけを採用する
         if (completed) best_move = best_at_depth;
     }
 

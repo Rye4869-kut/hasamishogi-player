@@ -5,6 +5,7 @@
 #include <unordered_map>
 
 // ── 定数 ──────────────────────────────────────────────
+// static にしている理由: 複数の .cpp からインクルードされても多重定義エラーにならないため
 static const int BS    = 9;
 static const char EMPTY = '.';
 static const char BLACK = 'B';
@@ -15,6 +16,8 @@ static const int DR[4] = { 1, -1,  0,  0 };
 static const int DC[4] = { 0,  0,  1, -1 };
 
 // ── ユーティリティ ──────────────────────────────────
+// inline にしている理由: 1行の単純な関数は呼び出しコストより中身の処理の方が軽いため
+// コンパイラが呼び出し元に直接展開してジャンプコストをなくす
 inline bool  in_bounds (int r, int c) { return r >= 0 && r < BS && c >= 0 && c < BS; }
 inline char  opp_color (char c)       { return c == BLACK ? WHITE : BLACK; }
 inline int   color_idx (char c)       { return c == BLACK ? 0 : 1; }
@@ -51,4 +54,6 @@ struct Board {
 };
 
 // 局面の出現回数テーブル型
+// using で長い型名に別名をつける: std::unordered_map<uint64_t, int> を毎回書かなくて済む
+// unordered_map はハッシュマップ（平均O(1)で検索）→ map のO(log n)より高速
 using StateTable = std::unordered_map<uint64_t, int>;

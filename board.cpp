@@ -8,11 +8,16 @@ static uint64_t ZB[BS][BS][3];  // 駒
 static uint64_t ZT[2];          // 手番
 static bool zob_initialized = false;
 
+// xorshift64: 高速な擬似乱数生成器
+// 標準の rand() より高品質でビット分布が均一，Zobristテーブル初期化に使う
 static uint64_t xorshift64(uint64_t& s) {
     s ^= s << 13; s ^= s >> 7; s ^= s << 17;
     return s;
 }
 
+// zob_initialized フラグの理由:
+// Board は探索中に何百万回もコピーされるがテーブルは最初の1回だけ作れば十分
+// 毎回作り直すとテーブルの内容が変わり同じ局面でも異なるハッシュ値になってしまう
 static void init_zobrist() {
     if (zob_initialized) return;
     uint64_t seed = 0xdeadbeefcafe1234ULL;
@@ -31,6 +36,10 @@ static int piece_idx(char p) {
     return 0;
 }
 
+// XOR でハッシュを計算する理由:
+// 同じ値を2回 XOR すると0になる性質を利用
+// 各マスの駒種と手番に対応する乱数を XOR するだけで局面全体を1つの整数で表現できる
+// 異なる局面が同じハッシュ値になる確率は 1/2^64 ≒ 0
 uint64_t Board::hash() const {
     uint64_t h = ZT[color_idx(turn)];
     for (int r = 0; r < BS; r++)
@@ -72,7 +81,7 @@ bool Board::is_clear_path(int r1, int c1, int r2, int c2) const {
 }
 
 // ── capture_from ──────────────────────────────────────
-// (r0,c0) から方向 (dr,dc) へ相手駒を探し、自駒で挟めたら取り除く
+// (r0,c0) から方向 (dr,dc) へ相手駒を探し，自駒で挟めたら取り除く
 // Python: capture_from の忠実移植
 int Board::capture_from(int r0, int c0, int dr, int dc, char me, char opp) {
     int r = r0 + dr, c = c0 + dc;
@@ -155,7 +164,7 @@ bool Board::is_legal_move(int r1, int c1, int r2, int c2, char me) const {
     if (!is_clear_path(r1, c1, r2, c2)) return false;
 
     // 5. 自殺手チェック:
-    //    移動先の対称位置に相手駒が両側にあるなら、
+    //    移動先の対称位置に相手駒が両側にあるなら，
     //    何かを取れなければ非合法（自殺）
     for (int d = 0; d < 4; d++) {
         int rp = r2 + DR[d], cp = c2 + DC[d];  // 正方向
@@ -193,6 +202,8 @@ void Board::apply_move(int r1, int c1, int r2, int c2, char me) {
 
     // pending_leader 更新
     // (3枚差 → 猶予1手ルール)
+    // lead >= 3: 自分が3枚以上リードしている → 自分が pending_leader になる
+    // lead >= -2 かつ相手が leader: 差が2以内に縮まった → 相手の leader 状態を解除
     int cm = captures[color_idx(me)];
     int co = captures[color_idx(opp)];
     int lead = cm - co;
@@ -229,13 +240,16 @@ std::vector<Move> Board::generate_legal_moves(char me) const {
 
 // ── is_game_over ──────────────────────────────────────
 // Python: is_game_over の忠実移植
-// 戻り値: 勝者 (BLACK / WHITE)、未決着なら EMPTY
+// 戻り値: 勝者 (BLACK / WHITE)，未決着なら EMPTY
 char Board::is_game_over() const {
     char opp = turn;                     // 次に指すプレイヤー
     char me  = opp_color(opp);           // 直前に指したプレイヤー
     int  cm  = captures[color_idx(me)];
 
     if (cm >= 5)              return me;       // 5枚差で即勝利
+    // pending_leader == opp の意味:
+    // opp（次に指すプレイヤー）が猶予をもらった側 = 差を縮められなかった = 負け
+    // pending_leader（3枚差をつけた側）が勝者になる
     if (pending_leader == opp) return pending_leader; // 猶予を活かせなかった側の勝利
     return EMPTY;
 }
