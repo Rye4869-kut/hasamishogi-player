@@ -1,6 +1,6 @@
 #include "eval.h"
 
-int evaluate(const Board& b, char me, const StateTable& state_table) {
+int evaluate(const Board& b, char me) {
     char opp = opp_color(me);
 
     // 1. 取り駒差（ゲームの主要な勝利条件に直結）
