@@ -2,8 +2,46 @@
 #include <queue>
 #include <vector>
 
+// ── Zobrist テーブル（起動時に一度だけ初期化） ──────────
+// cells[r][c] の駒種 (0=EMPTY, 1=BLACK, 2=WHITE) × 手番 (0=BLACK, 1=WHITE)
+static uint64_t ZB[BS][BS][3];  // 駒
+static uint64_t ZT[2];          // 手番
+static bool zob_initialized = false;
+
+static uint64_t xorshift64(uint64_t& s) {
+    s ^= s << 13; s ^= s >> 7; s ^= s << 17;
+    return s;
+}
+
+static void init_zobrist() {
+    if (zob_initialized) return;
+    uint64_t seed = 0xdeadbeefcafe1234ULL;
+    for (int r = 0; r < BS; r++)
+        for (int c = 0; c < BS; c++)
+            for (int k = 0; k < 3; k++)
+                ZB[r][c][k] = xorshift64(seed);
+    ZT[0] = xorshift64(seed);
+    ZT[1] = xorshift64(seed);
+    zob_initialized = true;
+}
+
+static int piece_idx(char p) {
+    if (p == BLACK) return 1;
+    if (p == WHITE) return 2;
+    return 0;
+}
+
+uint64_t Board::hash() const {
+    uint64_t h = ZT[color_idx(turn)];
+    for (int r = 0; r < BS; r++)
+        for (int c = 0; c < BS; c++)
+            h ^= ZB[r][c][piece_idx(cells[r][c])];
+    return h;
+}
+
 // ── 初期化 ───────────────────────────────────────────
 Board::Board() {
+    init_zobrist();
     memset(cells, EMPTY, sizeof(cells));
     for (int c = 0; c < BS; c++) {
         cells[0][c]    = BLACK;   // 黒は 0 行目

@@ -1,15 +1,6 @@
 #include "eval.h"
 
-// ── 評価関数 ─────────────────────────────────────────
-//
-// 現在の項目:
-//   1. 取り駒差         × 100
-//   2. 中央 3×3 支配   ±  5 / 駒
-//   3. 前進ボーナス     +  1 / (3行分)
-//
-// 後でモビリティ・危険度・脅威など追加しやすいように分離
-//
-int evaluate(const Board& b, char me) {
+int evaluate(const Board& b, char me, const StateTable& state_table) {
     char opp = opp_color(me);
 
     // 1. 取り駒差（ゲームの主要な勝利条件に直結）
@@ -23,15 +14,15 @@ int evaluate(const Board& b, char me) {
         }
     }
 
-    // 3. 前進ボーナス: 相手陣地に近いほど+
-    for (int r = 0; r < BS; r++) {
-        for (int c = 0; c < BS; c++) {
-            char p = b.cells[r][c];
-            if (p == me) {
-                // 黒は下(大きい r)が前進, 白は上(小さい r)が前進
-                score += (me == BLACK) ? r / 3 : (BS - 1 - r) / 3;
-            }
-        }
+    // 3. pending_leader の状態を評価
+    if (b.pending_leader == me)  score += 500;
+    if (b.pending_leader == opp) score -= 500;
+
+    // 5. 繰り返し検出: 3回以上出現した局面にペナルティ
+    auto it = state_table.find(b.hash());
+    if (it != state_table.end() && it->second >= 2) {
+        // 2回記録済み → この手を指すと3回目になる → ペナルティ
+        score -= REPETITION_PENALTY;
     }
 
     return score;

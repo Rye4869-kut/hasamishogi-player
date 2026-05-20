@@ -1,6 +1,8 @@
 #pragma once
 #include <vector>
 #include <cstring>
+#include <cstdint>
+#include <unordered_map>
 
 // ── 定数 ──────────────────────────────────────────────
 static const int BS    = 9;
@@ -43,4 +45,10 @@ struct Board {
 
     std::vector<Move> generate_legal_moves(char me) const;
     char is_game_over() const;  // 勝者を返す。決着なし → EMPTY
+
+    // Zobrist ハッシュ（盤面＋手番）
+    uint64_t hash() const;
 };
+
+// 局面の出現回数テーブル型
+using StateTable = std::unordered_map<uint64_t, int>;

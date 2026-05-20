@@ -4,7 +4,7 @@
 #include "search.h"
 
 static const double TIME_LIMIT = 1.0;  // 1手あたりの思考時間 (秒)
-static const char*  PLAYER_NAME = "Violence Takeda";  // ← 自分の名前に変える
+static const char*  PLAYER_NAME = "MyPlayer";  // ← 自分の名前に変える
 
 // 末尾の改行・スペースを除去
 static std::string trim(std::string s) {
@@ -42,25 +42,29 @@ int main() {
     char opp      = opp_color(my_color);
 
     Board board;
+    StateTable state_table;  // 局面の出現回数テーブル
     // 黒は先攻なので相手手の入力を最初だけスキップ
     bool skip_input = (my_color == BLACK);
 
     // ── メインループ ──────────────────────────────────
     while (true) {
         if (!skip_input) {
-            // 相手の指し手を受け取る (または GAME_OVER)
             if (!std::getline(std::cin, line)) break;
             line = trim(line);
             if (line.rfind("GAME_OVER", 0) == 0) break;
 
             Move opp_mv;
-            if (!parse_move(line, opp_mv)) break;  // 不正 → 終了
+            if (!parse_move(line, opp_mv)) break;
             board.apply_move(opp_mv.r1, opp_mv.c1, opp_mv.r2, opp_mv.c2, opp);
+            // 相手が指した後の局面を記録
+            state_table[board.hash()]++;
         }
 
         // 自分の手を選んで指す
-        Move mv = choose_best_move(board, my_color, TIME_LIMIT);
+        Move mv = choose_best_move(board, my_color, TIME_LIMIT, state_table);
         board.apply_move(mv.r1, mv.c1, mv.r2, mv.c2, my_color);
+        // 自分が指した後の局面を記録
+        state_table[board.hash()]++;
         std::cout << mv.r1 << mv.c1 << mv.r2 << mv.c2 << "\n" << std::flush;
 
         skip_input = false;

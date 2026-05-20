@@ -47,55 +47,52 @@ static std::vector<Move> order_moves(const Board& b,
 // ── Negamax Alpha-Beta ───────────────────────────────
 // Board を値渡し（コピー）することで手の "undo" を不要にする
 // 9×9 の char 配列なのでコピーコストは低い
-static int negamax(Board board, int depth, int alpha, int beta, char me) {
-    // 時間切れ → 葉ノードと同様に評価値を返す
+static int negamax(Board board, int depth, int alpha, int beta, char me,
+                   const StateTable& state_table) {
     if (elapsed() > g_time_limit * 0.95)
-        return evaluate(board, me);
+        return evaluate(board, me, state_table);
 
-    // 終局判定
     char winner = board.is_game_over();
     if (winner != EMPTY)
         return (winner == me) ? INF : -INF;
 
-    // 葉ノード
     if (depth == 0)
-        return evaluate(board, me);
+        return evaluate(board, me, state_table);
 
     char opp   = opp_color(me);
     auto moves = order_moves(board, board.generate_legal_moves(me), me);
 
     if (moves.empty())
-        return evaluate(board, me);  // 合法手なし (基本的に起きないはずだが念のため)
+        return evaluate(board, me, state_table);
 
     int best = -INF;
     for (const Move& mv : moves) {
-        Board next = board;                           // 盤面コピー
+        Board next = board;
         next.apply_move(mv.r1, mv.c1, mv.r2, mv.c2, me);
-        int val = -negamax(next, depth - 1, -beta, -alpha, opp);
+        int val = -negamax(next, depth - 1, -beta, -alpha, opp, state_table);
         if (val > best) best = val;
         if (val > alpha) alpha = val;
-        if (alpha >= beta) break;                     // Beta カット
+        if (alpha >= beta) break;
     }
     return best;
 }
 
-// ── 反復深化 ─────────────────────────────────────────
-Move choose_best_move(const Board& board, char me, double time_limit_sec) {
+Move choose_best_move(const Board& board, char me, double time_limit_sec,
+                      const StateTable& state_table) {
     g_start      = Clock::now();
     g_time_limit = time_limit_sec;
 
     char opp   = opp_color(me);
     auto moves = board.generate_legal_moves(me);
-    if (moves.empty()) return {0, 0, 0, 0};  // 合法手なし (安全策)
+    if (moves.empty()) return {0, 0, 0, 0};
 
     Move best_move = moves[0];
 
-    // depth=1 から始めて時間が許す限り深くする
     for (int depth = 1; ; depth++) {
         if (elapsed() > g_time_limit * 0.8) break;
 
         int  best_val = -INF - 1;
-        Move best_at_depth = best_move;   // 前の深さの結果をデフォルトに
+        Move best_at_depth = best_move;
         bool completed = true;
 
         auto ordered = order_moves(board, moves, me);
@@ -104,15 +101,14 @@ Move choose_best_move(const Board& board, char me, double time_limit_sec) {
 
             Board next = board;
             next.apply_move(mv.r1, mv.c1, mv.r2, mv.c2, me);
-            int val = -negamax(next, depth - 1, -INF, INF, opp);
+            int val = -negamax(next, depth - 1, -INF, INF, opp, state_table);
 
             if (val > best_val) {
-                best_val       = val;
-                best_at_depth  = mv;
+                best_val      = val;
+                best_at_depth = mv;
             }
         }
 
-        // 完走した深さの結果だけ採用（途中打ち切りは信頼しない）
         if (completed) best_move = best_at_depth;
     }
 
