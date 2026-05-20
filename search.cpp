@@ -2,6 +2,8 @@
 #include <algorithm>
 #include <vector>
 
+static const int REPETITION_PENALTY = INF;
+
 // ── タイマー ──────────────────────────────────────────
 // g_start, g_time_limit をグローバル変数にしている理由:
 // negamax の再帰呼び出しに毎回引数として渡すとシグネチャが複雑になるため
@@ -27,12 +29,10 @@ static int move_score(const Board& b, const Move& mv, char me) {
             cnt++; r += DR[d]; c += DC[d];
         }
         if (cnt > 0 && in_bounds(r, c) && b.cells[r][c] == me)
-            score += cnt * 60;  // 取れそうな駒数に比例
+            score += cnt * 60;
     }
 
-    // 中央への距離が小さいほど加点
     score -= (abs(4 - mv.r2) + abs(4 - mv.c2));
-
     return score;
 }
 
@@ -53,25 +53,34 @@ static int negamax(Board board, int depth, int alpha, int beta, char me,
                    const StateTable& state_table) {
     // 0.95: 再帰の中での打ち切り．本当に時間切れ直前でそれ以上再帰しても意味がない
     if (elapsed() > g_time_limit * 0.95)
-        return evaluate(board, me, state_table);
+        return evaluate(board, me);
 
     char winner = board.is_game_over();
     if (winner != EMPTY)
         return (winner == me) ? INF : -INF;
 
     if (depth == 0)
-        return evaluate(board, me, state_table);
+        return evaluate(board, me);
 
     char opp   = opp_color(me);
     auto moves = order_moves(board, board.generate_legal_moves(me), me);
 
     if (moves.empty())
-        return evaluate(board, me, state_table);
+        return evaluate(board, me);
 
     int best = -INF;
     for (const Move& mv : moves) {
         Board next = board;
         next.apply_move(mv.r1, mv.c1, mv.r2, mv.c2, me);
+
+        // 繰り返し検出: 符号反転前に自分視点で直接ペナルティを与える
+        // evaluate 内で検出すると Negamax の符号反転で報酬になってしまうためここで判定する
+        auto it = state_table.find(next.hash());
+        if (it != state_table.end() && it->second >= 2) {
+            if (-REPETITION_PENALTY > best) best = -REPETITION_PENALTY;
+            continue;
+        }
+
         // Negamax の核心: 相手から見たスコアは自分から見たスコアの符号を反転したもの
         // → どちらのターンでも「自分視点の最大化」だけ書けばよい
         int val = -negamax(next, depth - 1, -beta, -alpha, opp, state_table);
@@ -110,6 +119,17 @@ Move choose_best_move(const Board& board, char me, double time_limit_sec,
 
             Board next = board;
             next.apply_move(mv.r1, mv.c1, mv.r2, mv.c2, me);
+
+            // 繰り返し検出: 符号反転前に自分視点で直接ペナルティを与える
+            auto it = state_table.find(next.hash());
+            if (it != state_table.end() && it->second >= 2) {
+                if (-REPETITION_PENALTY > best_val) {
+                    best_val      = -REPETITION_PENALTY;
+                    best_at_depth = mv;
+                }
+                continue;
+            }
+
             int val = -negamax(next, depth - 1, -INF, INF, opp, state_table);
 
             if (val > best_val) {
