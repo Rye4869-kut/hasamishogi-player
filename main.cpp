@@ -4,7 +4,7 @@
 #include "search.h"
 
 static const double TIME_LIMIT = 1.0;  // 1手あたりの思考時間 (秒)
-static const char*  PLAYER_NAME = "MyPlayer";  // ← 自分の名前に変える
+static const char*  PLAYER_NAME = "Violence Takeda";  // ← 自分の名前に変える
 
 // 末尾の改行・スペースを除去
 static std::string trim(std::string s) {
