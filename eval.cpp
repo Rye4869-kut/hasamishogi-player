@@ -20,14 +20,5 @@ int evaluate(const Board& b, char me, const StateTable& state_table) {
     if (b.pending_leader == me)  score += 500;
     if (b.pending_leader == opp) score -= 500;
 
-    // 4. 繰り返し検出: 3回以上出現した局面にペナルティ
-    // state_table.find() が end() を返す場合: その局面がまだ1度も出現していない
-    // it->second >= 2 の意味: すでに2回記録済み = これを選ぶと3回目になる
-    auto it = state_table.find(b.hash());
-    if (it != state_table.end() && it->second >= 2) {
-        // 2回記録済み → この手を指すと3回目になる → ペナルティ
-        score -= REPETITION_PENALTY;
-    }
-
     return score;
 }
