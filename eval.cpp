@@ -20,5 +20,23 @@ int evaluate(const Board& b, char me) {
     if (b.pending_leader == me)  score += 500;
     if (b.pending_leader == opp) score -= 500;
 
+    // 4. 脅威評価: 次の手で取られる危険がある駒にペナルティ
+    // 取り駒差1枚（100点）より小さい値にすることで
+    // 「危険を避けるためなら駒を損する」という判断を防ぐ
+    for (int r = 0; r < BS; r++) {
+        for (int c = 0; c < BS; c++) {
+            if (b.cells[r][c] != me) continue;
+            // 4方向について，その軸で両側に相手駒がいれば危険
+            for (int d = 0; d < 2; d++) {  // 縦軸・横軸の2軸だけ確認
+                int rp = r + DR[d], cp = c + DC[d];  // 正方向
+                int rn = r - DR[d], cn = c - DC[d];  // 負方向
+                if (!in_bounds(rp, cp) || !in_bounds(rn, cn)) continue;
+                if (b.cells[rp][cp] == opp && b.cells[rn][cn] == opp) {
+                    score -= 80;  // 取り駒差1枚（100点）より少し小さい値
+                }
+            }
+        }
+    }
+
     return score;
 }
